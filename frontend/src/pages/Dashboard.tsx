@@ -97,15 +97,20 @@ function RangeToggle({ range, onChange }: { range: TimeRange; onChange: (r: Time
 }
 
 export default function Dashboard() {
-  const [timeRange,        setTimeRange]        = useState<TimeRange>('All')
-  const [posRange,           setPosRange]           = useState<TimeRange>('All')
-  const [selectedAsset,      setSelectedAsset]      = useState<string | null>(null)
-  const [portfolioHighlight, setPortfolioHighlight] = useState<string | null>(null)
-  const [showSpy,            setShowSpy]            = useState(false)
+  const [timeRange, setTimeRange] = useState<TimeRange>('All')
+  const [posRange, setPosRange] = useState<TimeRange>('All')
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
+
+  // setter for portfolio chart in stacked asset-area mode
+  const [positionsMode, setPositionsMode] = useState(false)
+  // sets asset areas currently shown while in positions mode
+  const [selectedPortfolioAssets, setSelectedPortfolioAssets] = useState<string[]>([])
+
+  const [showSpy, setShowSpy] = useState(false)
   const { data: current, isLoading } = useQuery({ queryKey: ['portfolio-current'], queryFn: getPortfolioCurrent })
-  const { data: history = [] }       = useQuery({ queryKey: ['portfolio-history'],  queryFn: getPortfolioHistory })
-  const { data: assets = [] }        = useQuery({ queryKey: ['assets'],             queryFn: getAssets })
-  const { data: benchmarkData }      = useQuery({ queryKey: ['portfolio-benchmark'], queryFn: getBenchmark, enabled: showSpy })
+  const { data: history = [] } = useQuery({ queryKey: ['portfolio-history'], queryFn: getPortfolioHistory })
+  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: getAssets })
+  const { data: benchmarkData } = useQuery({ queryKey: ['portfolio-benchmark'], queryFn: getBenchmark, enabled: showSpy })
 
   if (isLoading) return <p style={{ color: 'var(--muted)', fontSize: '14px' }}>Loading...</p>
 
@@ -151,9 +156,9 @@ export default function Dashboard() {
     ? Math.max(...historyWithToday.map((h: any) => h.total_value))
     : totalValue
 
-  const highlightMode = portfolioHighlight ? {
+  const highlightMode = positionsMode ? {
     assets: allAssetSeries,
-    selected: portfolioHighlight,
+    selectedAssets: selectedPortfolioAssets,
     maxValue: maxPortfolioValue,
   } : null
 
@@ -192,9 +197,30 @@ export default function Dashboard() {
     })
   })()
 
+  function togglePositionsMode() {
+    setPositionsMode(prev => !prev)
+  }
+
+  function togglePortfolioAsset(name: string) {
+  // positions mode must be toggled on to select assets for highlighting
+  if (!positionsMode) return
+
+  setSelectedPortfolioAssets(prev =>
+    prev.includes(name)
+      ? prev.filter(asset => asset !== name)
+      : [...prev, name]
+  )
+}
+
+  function isolatePortfolioAsset(name: string) {
+    if (!positionsMode) return
+
+    setSelectedPortfolioAssets([name])
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', paddingTop: '24px' }}>
-
+      
       {/* Stat row */}
       <div style={{ display: 'flex', alignItems: 'stretch' }}>
         <StatItem
@@ -227,16 +253,32 @@ export default function Dashboard() {
             <p style={sectionLabel}>Portfolio Over Time</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <RangeToggle range={timeRange} onChange={setTimeRange} />
-              <button
-                onClick={() => setShowSpy(s => !s)}
+             <button
+                disabled={positionsMode}
+                onClick={() => {
+                  if (positionsMode) return
+                  setShowSpy(s => !s)
+                }}
                 style={{
                   padding: '4px 12px',
                   fontSize: '12px',
                   borderRadius: '20px',
-                  border: showSpy ? '1px solid rgba(0,212,170,0.3)' : '1px solid rgba(255,255,255,0.1)',
-                  cursor: 'pointer',
-                  backgroundColor: showSpy ? 'rgba(0,212,170,0.15)' : 'rgba(255,255,255,0.06)',
-                  color: showSpy ? '#00d4aa' : 'rgba(255,255,255,0.4)',
+                  border: positionsMode
+                    ? '1px solid rgba(255,255,255,0.06)'
+                    : showSpy
+                      ? '1px solid rgba(0,212,170,0.3)'
+                      : '1px solid rgba(255,255,255,0.1)',
+                  backgroundColor: positionsMode
+                    ? 'rgba(255,255,255,0.03)'
+                    : showSpy
+                      ? 'rgba(0,212,170,0.15)'
+                      : 'rgba(255,255,255,0.06)',
+                  color: positionsMode
+                    ? 'rgba(255,255,255,0.2)'
+                    : showSpy
+                      ? '#00d4aa'
+                      : 'rgba(255,255,255,0.4)',
+                  opacity: positionsMode ? 0.7 : 1,
                   transition: 'all 0.15s',
                 }}
               >
@@ -299,15 +341,28 @@ export default function Dashboard() {
           />
         </div>
         <div>
-          <p style={{ ...sectionLabel, marginBottom: '16px' }}>Positions</p>
+          <p
+            onClick={togglePositionsMode}
+            style={{
+              ...sectionLabel,
+              marginBottom: '16px',
+              cursor: 'pointer',
+              color: positionsMode ? 'var(--text)' : sectionLabel.color,
+              transition: 'color 0.15s',
+              userSelect: 'none',
+            }}
+          >
+            Positions
+          </p>
           {assets.map((a: any, i: number) => {
             const isLast      = i === assets.length - 1
-            const isHighlighted = portfolioHighlight === a.name
-            const assetColor  = ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]
+            const isHighlighted = selectedPortfolioAssets.includes(a.name)
+            const assetColor = ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]
             return (
               <div
                 key={a.name}
-                onClick={() => setPortfolioHighlight(isHighlighted ? null : a.name)}
+                onClick={() => togglePortfolioAsset(a.name)}
+                onDoubleClick={() => isolatePortfolioAsset(a.name)}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -318,15 +373,15 @@ export default function Dashboard() {
                   borderRadius: '6px',
                   borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
                   cursor: 'pointer',
-                  backgroundColor: isHighlighted ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  backgroundColor: positionsMode && isHighlighted ? 'rgba(255,255,255,0.04)' : 'transparent',
                   transition: 'background 0.15s',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {isHighlighted && (
+                  {positionsMode && isHighlighted && (
                     <div style={{ width: '3px', height: '14px', borderRadius: '2px', backgroundColor: assetColor, flexShrink: 0 }} />
                   )}
-                  <p style={{ fontSize: '12px', fontWeight: isHighlighted ? 700 : 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0, color: isHighlighted ? assetColor : 'var(--text)' }}>{a.name}</p>
+                  <p style={{ fontSize: '12px', fontWeight: positionsMode && isHighlighted ? 700 : 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0, color: positionsMode && isHighlighted ? assetColor : 'var(--text)' }}>{a.name}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 3px', color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>

@@ -1,11 +1,11 @@
 export const ALLOCATION_COLORS = [
-  '#007a60',
-  '#008e6e',
-  '#00a882',
-  '#00bb96',
-  '#00d4aa',
-  '#50e3c5',
-  '#80edd8',
+  '#005B47',
+  '#007A60',
+  '#009978',
+  '#00B38C',
+  '#00D4AA',
+  '#38E0BB',
+  '#72EBD0',
 ]
 
 export function hexToRgba(hex: string, alpha: number): string {

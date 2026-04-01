@@ -14,7 +14,7 @@ interface AssetSeries {
 
 interface HighlightMode {
   assets: AssetSeries[]  // in positions-table order; assets[0] is topmost band (just below portfolio line)
-  selected: string
+  selectedAssets: string[]
   maxValue: number
 }
 
@@ -54,11 +54,19 @@ export default function PortfolioChart({ history, highlightMode, benchmark }: Pr
   let traces: any[]
 
   if (highlightMode) {
-    const { assets, selected, maxValue } = highlightMode
+    const { assets, selectedAssets, maxValue } = highlightMode
+    const selectedSet = new Set(selectedAssets)
+    // const hasSelection = selectedAssets.length > 0
+
     yRange = [0, maxValue * 1.06]
 
-    const SELECTED_FILL = 'rgba(0,212,170,0.28)'
-    const FAINT_FILL    = 'rgba(255,255,255,0.04)'
+    // const SELECTED_FILL = 'rgba(0,212,170,0.28)'
+    const FAINT_FILL = 'rgba(255,255,255,0)'
+
+    // Use each asset's own color for its area fill
+    function getAssetFill(asset: AssetSeries, isSelected: boolean): string {
+      return isSelected ? hexToRgba(asset.color, 0.65) : FAINT_FILL
+    }
 
     const n = assets.length
 
@@ -89,14 +97,14 @@ export default function PortfolioChart({ history, highlightMode, benchmark }: Pr
     })
 
     for (let i = n - 1; i >= 1; i--) {
-      const asset      = assets[i]
-      const isSelected = asset.name === selected
-      const assetVals  = dates.map(d => valueMaps[i].get(d) ?? 0)
+      const asset = assets[i]
+      const isSelected = selectedSet.has(asset.name)
+      const assetVals = dates.map(d => valueMaps[i].get(d) ?? 0)
       traces.push({
         x: dates, y: cumY[i - 1],
         type: 'scatter' as const, mode: 'none' as const,
         fill: 'tonexty' as const,
-        fillcolor: isSelected ? SELECTED_FILL : FAINT_FILL,
+        fillcolor: getAssetFill(asset, isSelected),
         customdata: assetVals,
         hovertemplate: isSelected
           ? `${asset.name.toUpperCase()}<br>%{x}<br><b>$%{customdata:,.0f}</b><extra></extra>`
@@ -106,13 +114,13 @@ export default function PortfolioChart({ history, highlightMode, benchmark }: Pr
       })
     }
 
-    const isSelected0 = assets[0].name === selected
+    const isSelected0 = selectedSet.has(assets[0].name)
     const assetVals0  = dates.map(d => valueMaps[0].get(d) ?? 0)
     traces.push({
       x: dates, y: values,
       type: 'scatter' as const, mode: 'none' as const,
       fill: 'tonexty' as const,
-      fillcolor: isSelected0 ? SELECTED_FILL : FAINT_FILL,
+      fillcolor: getAssetFill(assets[0], isSelected0),
       customdata: assetVals0,
       hovertemplate: isSelected0
         ? `${assets[0].name.toUpperCase()}<br>%{x}<br><b>$%{customdata:,.0f}</b><extra></extra>`
