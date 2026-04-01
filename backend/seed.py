@@ -5,14 +5,22 @@ Run: python seed.py
 Drops and recreates trading.db every time.
 """
 import json
+import math
 import os
 import random
+import statistics as stats_lib
 import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()
+
 sys.path.insert(0, str(Path(__file__).parent))
-from database import SessionLocal, create_tables, Trade, FredSnapshot, PortfolioHistory, BenchmarkHistory
+from database import (
+    SessionLocal, create_tables,
+    Trade, FredSnapshot, PortfolioHistory, BenchmarkHistory, StrategyEvaluation,
+)
 
 random.seed(42)
 
@@ -66,43 +74,83 @@ FRED_RANGES = {
     "MOCK_SERIES_7":    (80.0, 120.0),
 }
 
-# Weekly portfolio history with 2 genuine dips (3-8% from peaks)
+# One portfolio snapshot per trading day
 PORTFOLIO_HISTORY = [
     (date(2026, 1,  1),  100000.0),
-    (date(2026, 1,  8),  102400.0),
-    (date(2026, 1, 15),  105300.0),
-    (date(2026, 1, 22),  108100.0),
-    (date(2026, 1, 29),  111500.0),  # peak 1
-    (date(2026, 2,  5),  108200.0),  # dip 1: −3.0% from peak
-    (date(2026, 2, 12),  104600.0),  # dip 1: −6.2% from peak
-    (date(2026, 2, 19),  107800.0),  # recovery
-    (date(2026, 2, 26),  111900.0),  # new peak
-    (date(2026, 3,  5),  116200.0),
-    (date(2026, 3, 12),  120800.0),  # peak 2
-    (date(2026, 3, 19),  116100.0),  # dip 2: −3.9% from peak 2
-    (date(2026, 3, 26),  113400.0),  # dip 2: −6.1% from peak 2
-    (date(2026, 4,  1),  119700.0),  # recovery (today)
+    (date(2026, 1, 15),  103200.0),
+    (date(2026, 2,  1),  104600.0),  # dip — below Jan 15
+    (date(2026, 2, 15),  108900.0),
+    (date(2026, 3,  1),  111500.0),
+    (date(2026, 3, 15),  120800.0),
+    (date(2026, 4,  1),  119700.0),  # slight dip from Mar 15 peak
 ]
 
 # Fallback SPY prices if yfinance is unavailable (approximate 2026 values)
 SPY_FALLBACK = {
     date(2026, 1,  1): 592.00,
-    date(2026, 1,  8): 595.30,
     date(2026, 1, 15): 598.80,
-    date(2026, 1, 22): 602.40,
-    date(2026, 1, 29): 599.60,
-    date(2026, 2,  5): 596.20,
-    date(2026, 2, 12): 603.50,
-    date(2026, 2, 19): 609.10,
-    date(2026, 2, 26): 613.40,
-    date(2026, 3,  5): 617.80,
-    date(2026, 3, 12): 621.30,
-    date(2026, 3, 19): 616.50,
-    date(2026, 3, 26): 619.20,
+    date(2026, 2,  1): 601.30,
+    date(2026, 2, 15): 609.10,
+    date(2026, 3,  1): 613.40,
+    date(2026, 3, 15): 621.30,
     date(2026, 4,  1): 623.90,
 }
 
 INITIAL_UNITS = {pos["asset_name"]: pos["units_held"] for pos in INITIAL_POSITIONS}
+
+REAL_SERIES = {"GOLDAMGBD228NLBM", "CBBTCUSD", "NASDAQ100"}
+
+# For gold, try these series IDs in order before falling back to random
+GOLD_SERIES_ATTEMPTS = ["XAUUSD", "GOLDPMGBD228NLBM"]
+
+
+def fetch_fred_values(series_id: str, dates: list[date]) -> dict[date, float]:
+    """Fetch real FRED values for a series across the given dates.
+    Returns {date: float}. Falls back to random from FRED_RANGES on any failure.
+    For gold (GOLDAMGBD228NLBM), tries XAUUSD then GOLDPMGBD228NLBM before giving up.
+    """
+    import certifi
+    os.environ["SSL_CERT_FILE"] = certifi.where()
+    from fredapi import Fred
+    fred = Fred(api_key=os.getenv("FRED_API_KEY"))
+
+    lo, hi = FRED_RANGES[series_id]
+
+    # Build the list of series IDs to attempt
+    if series_id == "GOLDAMGBD228NLBM":
+        attempts = GOLD_SERIES_ATTEMPTS
+    else:
+        attempts = [series_id]
+
+    raw_series = None
+    used_id = None
+    for attempt_id in attempts:
+        try:
+            raw_series = fred.get_series(attempt_id)
+            used_id = attempt_id
+            print(f"  FRED: fetched {len(raw_series)} observations for {attempt_id}")
+            break
+        except Exception as e:
+            print(f"  FRED: {attempt_id} not available ({e}), trying next...")
+
+    if raw_series is None:
+        print(f"  FRED: all attempts failed for {series_id}, using random fallback for all dates")
+        return {d: round(random.uniform(lo, hi), 2) for d in dates}
+
+    result: dict[date, float] = {}
+    date_strings = raw_series.index.strftime("%Y-%m-%d")
+    for d in dates:
+        for offset in range(31):
+            lookup = (d - timedelta(days=offset)).strftime("%Y-%m-%d")
+            if lookup in date_strings:
+                val = raw_series[date_strings == lookup].iloc[-1]
+                if val is not None and not (isinstance(val, float) and val != val):  # skip NaN
+                    result[d] = round(float(val), 2)
+                    break
+        if d not in result:
+            result[d] = round(random.uniform(lo, hi), 2)
+            print(f"  FRED: no value found for {used_id} on {d}, using random fallback")
+    return result
 
 
 def fetch_spy_prices(dates: list[date]) -> dict[date, float] | None:
@@ -130,17 +178,42 @@ def fetch_spy_prices(dates: list[date]) -> dict[date, float] | None:
         return None
 
 
+def _signal_confidence(signal: str) -> float:
+    """Generate a mock signal confidence value. BACKFILL: replace with real cvxpy output."""
+    if signal in ("BUY", "SHORT"):
+        base = random.uniform(0.65, 0.95)
+    elif signal == "HOLD":
+        base = random.uniform(0.45, 0.65)
+    else:  # SELL
+        base = random.uniform(0.45, 0.95)
+    # Small variation to ensure uniqueness
+    return round(min(0.99, max(0.01, base + random.uniform(-0.015, 0.015))), 3)
+
+
 def seed():
     db = SessionLocal()
+
+    # Fetch real FRED values for known series, one batch per series
+    print("Fetching real FRED data...")
+    fred_cache: dict[str, dict[date, float]] = {}
+    for series_id in REAL_SERIES:
+        fred_cache[series_id] = fetch_fred_values(series_id, TRADING_DAYS)
 
     trade_changes: list[dict] = []
     asset4_trade_count = 0  # track confirmed past trades for asset4
 
+    # In-memory trade records for computing strategy evaluations
+    # (trade_date, asset_name, signal, ndr, confirmed)
+    seeded_trade_data: list[tuple] = []
+
     # ── Trades & FRED snapshots ────────────────────────────────────────────────
     for trade_date in TRADING_DAYS:
         for asset_name, series_id in ASSET_SERIES.items():
-            lo, hi = FRED_RANGES[series_id]
-            fred_value = round(random.uniform(lo, hi), 2)
+            if series_id in fred_cache and trade_date in fred_cache[series_id]:
+                fred_value = fred_cache[series_id][trade_date]
+            else:
+                lo, hi = FRED_RANGES[series_id]
+                fred_value = round(random.uniform(lo, hi), 2)
 
             db.add(FredSnapshot(
                 snapshot_date=trade_date,
@@ -183,6 +256,10 @@ def seed():
             else:
                 ndr = None
 
+            confidence = _signal_confidence(signal) if is_past else None
+
+            seeded_trade_data.append((trade_date, signal, ndr, is_past))
+
             db.add(Trade(
                 trade_date=trade_date,
                 asset_name=asset_name,
@@ -193,6 +270,7 @@ def seed():
                 position_size=size if is_past else None,
                 price_at_trade=price if is_past else None,
                 next_trading_day_return=ndr,
+                signal_confidence=confidence,
             ))
 
     # ── Portfolio history ──────────────────────────────────────────────────────
@@ -264,13 +342,67 @@ def seed():
             spy_pct_return=spy_pct_return,
         ))
 
+    # ── Strategy evaluations ───────────────────────────────────────────────────
+    for trade_date in TRADING_DAYS:
+        # win_rate: correct signals that trading day (confirmed, with ndr)
+        day_trades = [
+            (sig, ndr)
+            for (td, sig, ndr, conf) in seeded_trade_data
+            if td == trade_date and conf and ndr is not None
+        ]
+        if day_trades:
+            correct = sum(
+                1 for sig, ndr in day_trades
+                if (sig == "BUY" and ndr > 0)
+                or (sig in ("SELL", "SHORT") and ndr < 0)
+                or (sig == "HOLD")
+            )
+            win_rate = round(correct / len(day_trades) * 100, 1)
+        else:
+            win_rate = None
+
+        # Portfolio metrics: daily_returns up to this date (computed from PORTFOLIO_HISTORY)
+        ph_up_to = [(d, v) for d, v in PORTFOLIO_HISTORY if d <= trade_date]
+        daily_returns = [
+            (ph_up_to[i][1] - ph_up_to[i - 1][1]) / ph_up_to[i - 1][1] * 100
+            for i in range(1, len(ph_up_to))
+        ]
+
+        avg_return  = round(sum(daily_returns) / len(daily_returns), 4) if daily_returns else None
+        volatility  = round(stats_lib.stdev(daily_returns), 4) if len(daily_returns) >= 2 else None
+        sharpe_ratio = None
+        if avg_return is not None and volatility is not None and volatility > 0:
+            sharpe_ratio = round(avg_return / volatility * math.sqrt(24), 4)
+
+        # rolling_30d_return: portfolio % return over 30 days preceding this date
+        window_start = trade_date - timedelta(days=30)
+        ph_window = [(d, v) for d, v in PORTFOLIO_HISTORY if window_start <= d <= trade_date]
+        if len(ph_window) >= 2:
+            rolling_30d_return = round(
+                (ph_window[-1][1] - ph_window[0][1]) / ph_window[0][1] * 100, 2
+            )
+        elif len(ph_window) == 1:
+            rolling_30d_return = 0.0
+        else:
+            rolling_30d_return = None
+
+        db.add(StrategyEvaluation(
+            eval_date=trade_date,
+            sharpe_ratio=sharpe_ratio,
+            win_rate=win_rate,
+            avg_return=avg_return,
+            volatility=volatility,
+            rolling_30d_return=rolling_30d_return,
+        ))
+
     db.commit()
     db.close()
     print(
         f"Seeded {len(TRADING_DAYS) * len(ASSET_SERIES)} trades, "
         f"{len(TRADING_DAYS) * len(ASSET_SERIES)} FRED snapshots, "
         f"{len(PORTFOLIO_HISTORY)} portfolio snapshots, "
-        f"{len(history_dates)} benchmark rows."
+        f"{len(history_dates)} benchmark rows, "
+        f"{len(TRADING_DAYS)} strategy evaluation rows."
     )
 
 

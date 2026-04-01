@@ -24,6 +24,7 @@ class Trade(Base):
     position_size           = Column(Float, nullable=True)
     price_at_trade          = Column(Float, nullable=True)
     next_trading_day_return = Column(Float, nullable=True)     # backfilled after next trading day
+    signal_confidence       = Column(Float, nullable=True)     # BACKFILL: replace with real cvxpy confidence output. Range 0.0-1.0.
 
 
 class FredSnapshot(Base):
@@ -53,6 +54,17 @@ class BenchmarkHistory(Base):
     record_date    = Column(Date, nullable=False, index=True)
     spy_value      = Column(Float, nullable=False)      # $100k invested in SPY on Jan 1
     spy_pct_return = Column(Float, nullable=False)      # % return from $100k starting value
+
+
+class StrategyEvaluation(Base):
+    __tablename__ = "strategy_evaluations"
+    id                 = Column(Integer, primary_key=True, index=True)
+    eval_date          = Column(Date, nullable=False, index=True)
+    sharpe_ratio       = Column(Float, nullable=True)
+    win_rate           = Column(Float, nullable=True)   # percentage 0-100
+    avg_return         = Column(Float, nullable=True)   # average daily_return across all assets that trading day
+    volatility         = Column(Float, nullable=True)   # standard deviation of daily_returns up to this date
+    rolling_30d_return = Column(Float, nullable=True)   # portfolio % return over the last 30 days
 
 
 def get_db():

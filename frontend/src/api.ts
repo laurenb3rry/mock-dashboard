@@ -71,3 +71,15 @@ export async function getSignalAccuracy() {
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function getStrategyEvaluations() {
+  const res = await fetch('/api/strategy/evaluations')
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function getConfidenceHeatmap() {
+  const res = await fetch('/api/trades/confidence-heatmap')
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}

@@ -1,20 +1,13 @@
-import Plot from 'react-plotly.js'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getPortfolioCurrent, getPortfolioHistory, getAssets, getBenchmark } from '../api'
 import PortfolioChart from '../components/PortfolioChart'
 import AllocationChart from '../components/AllocationChart'
 import DrawdownChart from '../components/DrawdownChart'
-import SignalAccuracyChart from '../components/SignalAccuracyChart'
 import SignalAccuracyScorecard from '../components/SignalAccuracyScorecard'
-import { ALLOCATION_COLORS, hexToRgba } from '../constants'
-
-const card: React.CSSProperties = {
-  backgroundColor: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: '10px',
-  padding: '16px',
-}
+import RollingReturnChart from '../components/RollingReturnChart'
+import ConfidenceHeatmap from '../components/ConfidenceHeatmap'
+import { ALLOCATION_COLORS } from '../constants'
 
 const sectionLabel: React.CSSProperties = {
   fontSize: '11px',
@@ -24,9 +17,6 @@ const sectionLabel: React.CSSProperties = {
   color: 'var(--muted)',
   margin: 0,
 }
-
-const PLOT_FONT = { color: 'rgba(232,234,240,0.45)', size: 11, family: '-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif' }
-const PLOT_BASE = { paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: PLOT_FONT, showlegend: false }
 
 
 
@@ -98,7 +88,6 @@ function RangeToggle({ range, onChange }: { range: TimeRange; onChange: (r: Time
 
 export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('All')
-  const [posRange, setPosRange] = useState<TimeRange>('All')
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
 
   // setter for portfolio chart in stacked asset-area mode
@@ -107,7 +96,7 @@ export default function Dashboard() {
   const [selectedPortfolioAssets, setSelectedPortfolioAssets] = useState<string[]>([])
 
   const [showSpy, setShowSpy] = useState(false)
-  const { data: current, isLoading } = useQuery({ queryKey: ['portfolio-current'], queryFn: getPortfolioCurrent })
+  const { data: current, isLoading } = useQuery({ queryKey: ['portfolio-current'], queryFn: getPortfolioCurrent, staleTime: Infinity, refetchOnWindowFocus: false })
   const { data: history = [] } = useQuery({ queryKey: ['portfolio-history'], queryFn: getPortfolioHistory })
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: getAssets })
   const { data: benchmarkData } = useQuery({ queryKey: ['portfolio-benchmark'], queryFn: getBenchmark, enabled: showSpy })
@@ -162,40 +151,6 @@ export default function Dashboard() {
     maxValue: maxPortfolioValue,
   } : null
 
-  const filteredPosHistory = filterHistory(history, posRange)
-  const assetLines = (() => {
-    if (selectedAsset) {
-      const idx  = assetNames.indexOf(selectedAsset)
-      const base = ALLOCATION_COLORS[idx % ALLOCATION_COLORS.length]
-      return [{
-        x: filteredPosHistory.map((h: any) => h.record_date),
-        y: filteredPosHistory.map((h: any) => {
-          const pos = parsePositions(h.positions_json).find((p: any) => p.asset_name === selectedAsset)
-          return pos?.current_value ?? null
-        }),
-        type: 'scatter' as const,
-        mode: 'lines'  as const,
-        name: selectedAsset.toUpperCase(),
-        line: { color: base, width: 2.5 },
-        hovertemplate: `${selectedAsset.toUpperCase()}<br>%{x}<br><b>$%{y:,.0f}</b><extra></extra>`,
-      }]
-    }
-    return assetNames.map((name, idx) => {
-      const base = ALLOCATION_COLORS[idx % ALLOCATION_COLORS.length]
-      return {
-        x: filteredPosHistory.map((h: any) => h.record_date),
-        y: filteredPosHistory.map((h: any) => {
-          const pos = parsePositions(h.positions_json).find((p: any) => p.asset_name === name)
-          return pos?.current_value ?? null
-        }),
-        type: 'scatter' as const,
-        mode: 'lines'  as const,
-        name: name.toUpperCase(),
-        line: { color: hexToRgba(base, 0.25), width: 1 },
-        hovertemplate: `${name.toUpperCase()}<br>%{x}<br><b>$%{y:,.0f}</b><extra></extra>`,
-      }
-    })
-  })()
 
   function togglePositionsMode() {
     setPositionsMode(prev => !prev)
@@ -403,42 +358,19 @@ export default function Dashboard() {
         <AllocationChart assets={assets} positions={positions} selected={selectedAsset} onSelect={setSelectedAsset} />
       </div>
 
-      {/* Per-asset value over time */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <p style={{ ...sectionLabel, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)' }}>
-            {selectedAsset ? selectedAsset.toUpperCase() : 'Position Value Over Time'}
-          </p>
-          <RangeToggle range={posRange} onChange={setPosRange} />
-        </div>
-        <Plot
-          data={assetLines}
-          layout={{
-            ...PLOT_BASE,
-            showlegend: false,
-            margin: { t: 8, r: 16, b: 16, l: 72 },
-            xaxis: { gridcolor: 'rgba(255,255,255,0.04)', linecolor: 'transparent', tickfont: { size: 11 } },
-            yaxis: { gridcolor: 'rgba(255,255,255,0.04)', linecolor: 'transparent', tickprefix: '$', tickformat: ',.0f', tickfont: { size: 11 }, autorange: true },
-            hovermode: 'x unified',
-            hoverlabel: { bgcolor: '#1a1a2e', bordercolor: 'rgba(0,212,170,0.3)', font: { color: '#fff', size: 12 } },
-          }}
-          config={{ displayModeBar: false, responsive: true }}
-          style={{ width: '100%', height: '300px' }}
-          useResizeHandler
-        />
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
-
       <DrawdownChart />
 
       <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
 
-      <SignalAccuracyChart />
+      <SignalAccuracyScorecard />
 
       <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
 
-      <SignalAccuracyScorecard />
+      <RollingReturnChart />
+
+      <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
+
+      <ConfidenceHeatmap />
 
     </div>
   )

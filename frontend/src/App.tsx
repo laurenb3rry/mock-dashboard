@@ -84,7 +84,7 @@ export default function App() {
 
           <NavItem to="/" end icon={<GridIcon />} label="Dashboard" />
           <NavItem to="/trading-day" icon={<ChartIcon />} label="Trading Day" />
-          <NavItem to="/tables" icon={<TableIcon />} label="Tables" />
+          <NavItem to="/tables" icon={<TableIcon />} label="Signal Results" />
         </nav>
 
         {/* Main content */}
