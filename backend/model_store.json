@@ -1,0 +1,13 @@
+{
+  "initial_portfolio_value": 100000,
+  "trading_start_date": "2026-01-01",
+  "assets": [
+    { "name": "gold",   "fred_series": "GOLDAMGBD228NLBM", "initial_allocation": 14285.71, "optuna_weight": 0.18 },
+    { "name": "btc",    "fred_series": "CBBTCUSD",         "initial_allocation": 14285.71, "optuna_weight": 0.12 },
+    { "name": "qqq",    "fred_series": "NASDAQ100",        "initial_allocation": 14285.71, "optuna_weight": 0.20 },
+    { "name": "asset4", "fred_series": "MOCK_SERIES_4",    "initial_allocation": 14285.71, "optuna_weight": 0.15 },
+    { "name": "asset5", "fred_series": "MOCK_SERIES_5",    "initial_allocation": 14285.71, "optuna_weight": 0.14 },
+    { "name": "asset6", "fred_series": "MOCK_SERIES_6",    "initial_allocation": 14285.71, "optuna_weight": 0.11 },
+    { "name": "asset7", "fred_series": "MOCK_SERIES_7",    "initial_allocation": 14285.71, "optuna_weight": 0.10 }
+  ]
+}

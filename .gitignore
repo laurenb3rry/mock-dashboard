@@ -1,0 +1,37 @@
+# private env / secrets
+.env
+backend/.env
+
+# local databases
+backend/data/trading.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+backend/.venv/
+*.egg-info/
+
+# frontend / node
+node_modules/
+frontend/node_modules/
+dist/
+build/
+.vite/
+
+# editor / tooling
+.vscode/
+.idea/
+
+# project-specific private/planning files
+.claude/
+plan.md
+planv2.md
+GapsAndLimitations.md

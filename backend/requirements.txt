@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+fredapi
+yfinance
+numpy
+pandas
+cvxpy
+optuna
+python-dotenv
