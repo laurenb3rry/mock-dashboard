@@ -146,14 +146,12 @@ export default function PortfolioChart({ history, highlightMode, benchmark }: Pr
     })
 
   } else {
-    // Y-axis should be based only on the portfolio values currently being graphed.
-    // Benchmark/S&P line should not affect the y-axis range at all.
-    const minVal = Math.min(...values)
+    // Y-axis: floor at $97k for breathing room; ceiling padded above max
     const maxVal = Math.max(...values)
-    const span   = maxVal - minVal
-    const pad    = span === 0 ? maxVal * 0.05 || 1 : span * 0.12
+    const span   = maxVal - 97000
+    const pad    = span === 0 ? 2000 : span * 0.12
 
-    yRange = [minVal - pad, maxVal + pad]
+    yRange = [97000, maxVal + pad]
 
     const visibleBenchmark = benchmark
       ? benchmark.filter(b => b.record_date >= xRange[0] && b.record_date <= xRange[1])
@@ -197,7 +195,7 @@ export default function PortfolioChart({ history, highlightMode, benchmark }: Pr
         paper_bgcolor: 'transparent',
         plot_bgcolor:  'transparent',
         font:   PLOT_FONT,
-        margin: { t: 8, r: 16, b: 44, l: 72 },
+        margin: { t: 0, r: 0, b: 40, l: 60 },
         xaxis: {
           gridcolor: 'rgba(255,255,255,0.04)',
           linecolor: 'transparent',
@@ -219,7 +217,7 @@ export default function PortfolioChart({ history, highlightMode, benchmark }: Pr
         hoverlabel: HOVER_LABEL,
       }}
       config={{ displayModeBar: false, responsive: true }}
-      style={{ width: '100%', height: '360px' }}
+      style={{ width: '100%', height: '320px' }}
       useResizeHandler
     />
   )

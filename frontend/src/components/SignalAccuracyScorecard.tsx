@@ -8,16 +8,15 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 const sectionLabel: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: 700,
-  letterSpacing: '0.1em',
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.35)',
-  margin: 0,
+  color: 'rgba(255,255,255,0.3)',
+  margin: '0 0 16px',
 }
 
 function arcColor(pct: number | null, lowSample: boolean): string {
   if (lowSample || pct === null) return 'rgba(255,255,255,0.15)'
   if (pct >= 70) return '#00d4aa'
-  if (pct >= 50) return '#f59e0b'
   return '#ff4d4d'
 }
 
@@ -82,7 +81,7 @@ function RingCard({ row, index }: { row: any; index: number }) {
         <text
           x="40" y="44"
           textAnchor="middle"
-          fontSize="18"
+          fontSize="20"
           fontWeight="800"
           fontFamily="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
           fill={noData ? 'rgba(255,255,255,0.2)' : color}
@@ -110,7 +109,7 @@ function RingCard({ row, index }: { row: any; index: number }) {
           {noData ? 'no data' : `${row.correct_signals} / ${row.total_signals} trades`}
         </p>
         {lowSample && (
-          <p style={{ fontSize: '10px', color: '#f59e0b', margin: '3px 0 0' }}>
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: '3px 0 0' }}>
             low sample
           </p>
         )}

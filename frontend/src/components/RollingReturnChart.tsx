@@ -8,9 +8,9 @@ const PLOT_FONT = { color: 'rgba(232,234,240,0.45)', size: 11, family: '-apple-s
 const sectionLabel: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: 700,
-  letterSpacing: '0.1em',
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.35)',
+  color: 'rgba(255,255,255,0.3)',
   margin: 0,
 }
 
@@ -50,7 +50,7 @@ export default function RollingReturnChart() {
     paper_bgcolor: 'transparent',
     plot_bgcolor:  'transparent',
     font:   PLOT_FONT,
-    margin: { t: 24, r: 16, b: 44, l: 72 },
+    margin: { t: 0, r: 0, b: 40, l: 60 },
     xaxis: {
       gridcolor: 'rgba(255,255,255,0.04)',
       linecolor: 'transparent',
@@ -65,7 +65,7 @@ export default function RollingReturnChart() {
     },
     showlegend: false,
     hovermode: 'x unified',
-    hoverlabel: { bgcolor: '#1a1a2e', bordercolor: 'rgba(0,212,170,0.3)', font: { color: '#fff', size: 12 } },
+    hoverlabel: { bgcolor: '#16161f', bordercolor: 'rgba(0,212,170,0.3)', font: { color: '#fff', size: 12 } },
     shapes: [
       { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0, y1: 0, line: { color: 'rgba(255,255,255,0.2)', width: 1 } },
     ],
@@ -73,7 +73,7 @@ export default function RollingReturnChart() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
         <p style={sectionLabel}>Rolling 30-Day Return</p>
         <div
           style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
@@ -87,7 +87,7 @@ export default function RollingReturnChart() {
               bottom: '120%',
               left: '50%',
               transform: 'translateX(-50%)',
-              backgroundColor: '#1a1a2e',
+              backgroundColor: '#16161f',
               border: '1px solid rgba(0,212,170,0.3)',
               color: '#fff',
               fontSize: '11px',
@@ -106,7 +106,7 @@ export default function RollingReturnChart() {
         data={traces}
         layout={layout}
         config={{ displayModeBar: false, responsive: true }}
-        style={{ width: '100%', height: '220px' }}
+        style={{ width: '100%', height: '180px' }}
         useResizeHandler
       />
       <div style={{ display: 'flex', gap: '32px', marginTop: '8px' }}>

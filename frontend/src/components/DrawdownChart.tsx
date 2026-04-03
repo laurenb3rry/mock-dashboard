@@ -7,10 +7,10 @@ const PLOT_FONT = { color: 'rgba(232,234,240,0.45)', size: 11, family: '-apple-s
 const sectionLabel: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: 700,
-  letterSpacing: '0.1em',
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.35)',
-  margin: 0,
+  color: 'rgba(255,255,255,0.3)',
+  margin: '0 0 16px',
 }
 
 export default function DrawdownChart() {
@@ -54,7 +54,7 @@ export default function DrawdownChart() {
           paper_bgcolor: 'transparent',
           plot_bgcolor:  'transparent',
           font:   PLOT_FONT,
-          margin: { t: 16, r: 16, b: 44, l: 72 },
+          margin: { t: 0, r: 0, b: 40, l: 60 },
           xaxis: {
             gridcolor: 'rgba(255,255,255,0.04)',
             linecolor: 'transparent',
@@ -73,7 +73,7 @@ export default function DrawdownChart() {
           hoverlabel: { bgcolor: '#16161f', bordercolor: 'rgba(255,77,77,0.3)', font: { color: '#e8eaf0', size: 12 } },
         }}
         config={{ displayModeBar: false, responsive: true }}
-        style={{ width: '100%', height: '200px' }}
+        style={{ width: '100%', height: '180px' }}
         useResizeHandler
       />
       <p style={{ fontSize: '12px', color: '#ff4d4d', margin: '4px 0 0' }}>

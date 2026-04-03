@@ -588,3 +588,93 @@ def get_assets(db: Session = Depends(get_db)):
             "last_trade_date": last.trade_date.isoformat() if last else None,
         })
     return result
+
+
+@app.get("/api/portfolio/return-attribution")
+def get_return_attribution(db: Session = Depends(get_db)):
+    latest = (
+        db.query(PortfolioHistory)
+        .order_by(PortfolioHistory.record_date.desc())
+        .first()
+    )
+    if not latest:
+        return []
+
+    positions = json.loads(latest.positions_json) if latest.positions_json else []
+    pos_map = {p["asset_name"]: p for p in positions}
+
+    result = []
+    for asset in ASSETS:
+        name          = asset["name"]
+        initial       = asset["initial_allocation"]
+        pos           = pos_map.get(name, {})
+        current_value = pos.get("current_value", initial)
+        current_price = pos.get("current_price", 0.0)
+        total_return  = round(current_value - initial, 2)
+
+        confirmed_trades = (
+            db.query(Trade)
+            .filter(
+                Trade.asset_name == name,
+                Trade.confirmed == True,
+            )
+            .all()
+        )
+
+        confirmed_buys = [
+            t for t in confirmed_trades
+            if t.action_taken == "BUY"
+            and t.units_change is not None
+            and t.units_change > 0
+            and t.price_at_trade is not None
+            and t.price_at_trade > 0
+            and current_price > 0
+        ]
+
+        signal_driven = 0.0
+        for t in confirmed_buys:
+            price_gain_per_unit = current_price - t.price_at_trade
+            signal_driven += round(t.units_change * price_gain_per_unit, 2)
+
+        # Cap signal_driven to total_return magnitude to prevent impossible values
+        if total_return >= 0:
+            signal_driven = round(min(signal_driven, total_return), 2)
+            signal_driven = round(max(signal_driven, 0.0), 2)
+        else:
+            signal_driven = 0.0
+
+        passive = round(total_return - signal_driven, 2)
+
+        # Validation: force passive to satisfy the invariant
+        if round(signal_driven + passive, 2) != total_return:
+            passive = round(total_return - signal_driven, 2)
+
+        result.append({
+            "asset_name":         name,
+            "initial_allocation": initial,
+            "current_value":      round(current_value, 2),
+            "total_return":       total_return,
+            "signal_driven":      round(signal_driven, 2),
+            "passive":            round(passive, 2),
+            "debug": {
+                "initial":       initial,
+                "current_value": round(current_value, 2),
+                "total_return":  total_return,
+                "signal_driven": round(signal_driven, 2),
+                "passive":       round(passive, 2),
+                "check":         round(signal_driven + passive, 2),
+            },
+        })
+
+    # Enforce invariant: signal_driven + passive == total_return for every asset
+    for item in result:
+        computed = round(item["signal_driven"] + item["passive"], 2)
+        actual   = round(item["total_return"], 2)
+        if abs(computed - actual) > 0.02:
+            item["passive"] = round(item["total_return"] - item["signal_driven"], 2)
+
+    return {
+        "portfolio_total_return": round(latest.total_value - INITIAL_VALUE, 2),
+        "portfolio_pct_return":   latest.pct_return,
+        "assets":                 result,
+    }

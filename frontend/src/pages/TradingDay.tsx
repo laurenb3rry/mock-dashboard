@@ -19,7 +19,7 @@ const card: React.CSSProperties = {
 }
 
 const sectionLabel: React.CSSProperties = {
-  fontSize: '10px',
+  fontSize: '11px',
   fontWeight: 700,
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
@@ -171,7 +171,7 @@ export default function TradingDay() {
           {/* Header row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr', gap: '12px', marginBottom: '10px', padding: '0 2px' }}>
             {['Asset', 'Action', 'Size (total $)', 'Price (per unit)'].map(h => (
-              <span key={h} style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>
+              <span key={h} style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>
                 {h}
               </span>
             ))}

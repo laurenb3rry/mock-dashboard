@@ -11,9 +11,9 @@ const CELL_HEIGHT     = 40
 const sectionLabel: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: 700,
-  letterSpacing: '0.1em',
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.35)',
+  color: 'rgba(255,255,255,0.3)',
   margin: 0,
 }
 
@@ -63,7 +63,7 @@ export default function ConfidenceHeatmap() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
         <p style={sectionLabel}>Strategy Confidence Heatmap</p>
         <div
           style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
@@ -77,7 +77,7 @@ export default function ConfidenceHeatmap() {
               bottom: '120%',
               left: '50%',
               transform: 'translateX(-50%)',
-              backgroundColor: '#1a1a2e',
+              backgroundColor: '#16161f',
               border: '1px solid rgba(0,212,170,0.3)',
               color: '#fff',
               fontSize: '11px',
@@ -160,7 +160,7 @@ export default function ConfidenceHeatmap() {
                   }}
                   onMouseLeave={() => setTooltip(null)}
                 >
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#fff', userSelect: 'none' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff', userSelect: 'none' }}>
                     {signalBadge(signal)}
                   </span>
                 </div>
@@ -197,7 +197,7 @@ export default function ConfidenceHeatmap() {
           left: tooltip.x,
           top: tooltip.y - 52,
           transform: 'translateX(-50%)',
-          backgroundColor: '#1a1a2e',
+          backgroundColor: '#16161f',
           border: '1px solid rgba(0,212,170,0.3)',
           color: '#fff',
           fontSize: '12px',

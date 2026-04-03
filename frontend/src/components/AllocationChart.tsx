@@ -27,7 +27,7 @@ export default function AllocationChart({ assets, positions, selected, onSelect 
   return (
     <div>
       {/* Single stacked bar */}
-      <div style={{ display: 'flex', width: '100%', height: '32px', borderRadius: '4px', overflow: 'hidden', gap: '2px' }}>
+      <div style={{ display: 'flex', width: '100%', height: '28px', borderRadius: '4px', overflow: 'hidden', gap: '2px' }}>
         {assets.map((a: any, i: number) => (
           <div
             key={a.name}
@@ -55,10 +55,10 @@ export default function AllocationChart({ assets, positions, selected, onSelect 
             key={a.name}
             style={{ width: `${a.allocation_pct}%`, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', overflow: 'hidden' }}
           >
-            <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: selected === a.name ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: selected === a.name ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
               {a.name}
             </span>
-            <span style={{ fontSize: '10px', color: selected === a.name ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '11px', color: selected === a.name ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
               {a.allocation_pct.toFixed(1)}%
             </span>
           </div>
@@ -77,7 +77,7 @@ export default function AllocationChart({ assets, positions, selected, onSelect 
             left: tooltipPos.x + 18 + 190 > window.innerWidth ? tooltipPos.x - 208 : tooltipPos.x + 18,
             top:  tooltipPos.y + 12,
             zIndex: 100,
-            backgroundColor: '#1a1a2e',
+            backgroundColor: '#16161f',
             border: '1px solid rgba(0,212,170,0.3)',
             borderRadius: '8px',
             padding: '12px',

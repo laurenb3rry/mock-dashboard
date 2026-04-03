@@ -307,6 +307,15 @@ def seed():
                 "current_value":   round(units_held * current_price, 2),
             })
 
+        # Normalize current_values so they sum exactly to total_value
+        raw_total = sum(p["current_value"] for p in positions)
+        scale_factor = total_value / raw_total if raw_total > 0 else 1.0
+        for p in positions:
+            p["current_value"] = round(p["current_value"] * scale_factor, 2)
+        # Last asset absorbs rounding remainder
+        running_sum = sum(p["current_value"] for p in positions[:-1])
+        positions[-1]["current_value"] = round(total_value - running_sum, 2)
+
         db.add(PortfolioHistory(
             record_date=record_date,
             total_value=total_value,

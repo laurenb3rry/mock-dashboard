@@ -78,6 +78,12 @@ export async function getStrategyEvaluations() {
   return res.json()
 }
 
+export async function getReturnAttribution() {
+  const res = await fetch('/api/portfolio/return-attribution')
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function getConfidenceHeatmap() {
   const res = await fetch('/api/trades/confidence-heatmap')
   if (!res.ok) throw new Error(await res.text())

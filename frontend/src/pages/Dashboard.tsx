@@ -1,51 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getPortfolioCurrent, getPortfolioHistory, getAssets, getBenchmark } from '../api'
 import PortfolioChart from '../components/PortfolioChart'
+import TotalReturnSankey from '../components/TotalReturnSankey'
 import AllocationChart from '../components/AllocationChart'
 import DrawdownChart from '../components/DrawdownChart'
-import SignalAccuracyScorecard from '../components/SignalAccuracyScorecard'
 import RollingReturnChart from '../components/RollingReturnChart'
 import ConfidenceHeatmap from '../components/ConfidenceHeatmap'
 import { ALLOCATION_COLORS } from '../constants'
 
-const sectionLabel: React.CSSProperties = {
+const CARD: React.CSSProperties = {
+  padding: 0,
+}
+
+const STAT_LABEL: React.CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: 'rgba(255,255,255,0.4)',
+  margin: '0 0 6px',
+}
+
+const SECTION_LABEL: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: 700,
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  color: 'var(--muted)',
+  color: 'rgba(255,255,255,0.3)',
   margin: 0,
 }
-
-
 
 function parsePositions(raw: any): any[] {
   if (!raw) return []
   if (typeof raw === 'string') { try { return JSON.parse(raw) } catch { return [] } }
   return Array.isArray(raw) ? raw : []
-}
-
-function StatItem({ label, value, valueColor, trend }: {
-  label: string
-  value: string
-  valueColor?: string
-  trend?: { value: number; suffix?: string }
-}) {
-  const up = (trend?.value ?? 0) >= 0
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <p style={sectionLabel}>{label}</p>
-      <p style={{ fontSize: '36px', fontWeight: 800, margin: 0, lineHeight: 1, color: valueColor ?? 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{value}</p>
-      {trend ? (
-        <p style={{ fontSize: '13px', margin: 0, color: up ? 'var(--positive)' : 'var(--negative)' }}>
-          {up ? '↑' : '↓'} {Math.abs(trend.value).toFixed(2)}%{trend.suffix ? ` ${trend.suffix}` : ''}
-        </p>
-      ) : (
-        <p style={{ fontSize: '13px', margin: 0, color: 'transparent' }}>·</p>
-      )}
-    </div>
-  )
 }
 
 type TimeRange = '1M' | '3M' | '1Y' | 'All'
@@ -60,42 +49,51 @@ function filterHistory(history: any[], range: TimeRange): any[] {
   return history.filter((h: any) => h.record_date >= cutoffStr)
 }
 
-function RangeToggle({ range, onChange }: { range: TimeRange; onChange: (r: TimeRange) => void }) {
+function PillButton({ active, disabled, onClick, children }: {
+  active: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode
+}) {
   return (
-    <div style={{ display: 'flex', gap: '2px' }}>
-      {TIME_RANGES.map(r => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          style={{
-            padding: '4px 9px',
-            fontSize: '11px',
-            fontWeight: range === r ? 700 : 400,
-            borderRadius: '4px',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: range === r ? 'var(--accent-dim)' : 'transparent',
-            color: range === r ? 'var(--accent)' : 'var(--dim)',
-            transition: 'all 0.12s',
-          }}
-        >
-          {r}
-        </button>
-      ))}
-    </div>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '4px 10px',
+        height: 26,
+        fontSize: '11px',
+        fontWeight: active ? 600 : 400,
+        borderRadius: '20px',
+        border: active ? '1px solid rgba(0,212,170,0.3)' : '1px solid rgba(255,255,255,0.08)',
+        cursor: disabled ? 'default' : 'pointer',
+        backgroundColor: active ? 'rgba(0,212,170,0.15)' : 'rgba(255,255,255,0.04)',
+        color: active ? '#00d4aa' : disabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)',
+        transition: 'all 0.12s',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
 export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('All')
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
-
-  // setter for portfolio chart in stacked asset-area mode
   const [positionsMode, setPositionsMode] = useState(false)
-  // sets asset areas currently shown while in positions mode
   const [selectedPortfolioAssets, setSelectedPortfolioAssets] = useState<string[]>([])
-
   const [showSpy, setShowSpy] = useState(false)
+  const [chartView, setChartView] = useState<'portfolio' | 'sankey'>('portfolio')
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        setChartView(v => v === 'portfolio' ? 'sankey' : 'portfolio')
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   const { data: current, isLoading } = useQuery({ queryKey: ['portfolio-current'], queryFn: getPortfolioCurrent, staleTime: Infinity, refetchOnWindowFocus: false })
   const { data: history = [] } = useQuery({ queryKey: ['portfolio-history'], queryFn: getPortfolioHistory })
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: getAssets })
@@ -115,14 +113,7 @@ export default function Dashboard() {
     return [...history, { record_date: today, total_value: current.total_value }]
   })()
 
-  const lastTrade = assets
-    .map((a: any) => a.last_trade_date)
-    .filter(Boolean)
-    .sort()
-    .pop() ?? '—'
-
   const positions: any[] = current?.positions ?? []
-
   const assetNames: string[] = assets.map((a: any) => a.name)
 
   const allAssetSeries = assetNames.map((name, idx) => {
@@ -134,10 +125,7 @@ export default function Dashboard() {
       return pos?.current_value ?? null
     })
     const todayPos = positions.find((p: any) => p.asset_name === name)
-    if (todayPos && x[x.length - 1] !== today) {
-      x.push(today)
-      y.push(todayPos.current_value)
-    }
+    if (todayPos && x[x.length - 1] !== today) { x.push(today); y.push(todayPos.current_value) }
     return { name, color, x, y }
   })
 
@@ -151,226 +139,208 @@ export default function Dashboard() {
     maxValue: maxPortfolioValue,
   } : null
 
-
-  function togglePositionsMode() {
-    setPositionsMode(prev => !prev)
-  }
-
   function togglePortfolioAsset(name: string) {
-  // positions mode must be toggled on to select assets for highlighting
-  if (!positionsMode) return
-
-  setSelectedPortfolioAssets(prev =>
-    prev.includes(name)
-      ? prev.filter(asset => asset !== name)
-      : [...prev, name]
-  )
-}
+    if (!positionsMode) return
+    setSelectedPortfolioAssets(prev =>
+      prev.includes(name) ? prev.filter(a => a !== name) : [...prev, name]
+    )
+  }
 
   function isolatePortfolioAsset(name: string) {
     if (!positionsMode) return
-
     setSelectedPortfolioAssets([name])
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', paddingTop: '24px' }}>
-      
-      {/* Stat row */}
-      <div style={{ display: 'flex', alignItems: 'stretch' }}>
-        <StatItem
-          label="Portfolio Value"
-          value={`$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-          trend={{ value: pctReturn, suffix: 'all time' }}
-        />
-        <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.07)', flexShrink: 0, margin: '0 32px' }} />
-        <StatItem
-          label="Total Return"
-          value={`${pctReturn >= 0 ? '+' : ''}${pctReturn.toFixed(2)}%`}
-          valueColor={pctReturn >= 0 ? 'var(--positive)' : 'var(--negative)'}
-          trend={{ value: dollarGain / 1000, suffix: `($${Math.abs(dollarGain).toLocaleString(undefined, { maximumFractionDigits: 0 })})` }}
-        />
-        <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.07)', flexShrink: 0, margin: '0 32px' }} />
-        <StatItem label="Last Trade" value={lastTrade} />
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', paddingTop: 8, maxWidth: 1100, margin: '0 auto' }}>
 
-      {/* Portfolio chart + positions — no card borders */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: '40px', alignItems: 'start' }}>
-        <div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '8px'
-            }}
-          >
-            <p style={sectionLabel}>Portfolio Over Time</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <RangeToggle range={timeRange} onChange={setTimeRange} />
-             <button
-                disabled={positionsMode}
-                onClick={() => {
-                  if (positionsMode) return
-                  setShowSpy(s => !s)
-                }}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '12px',
-                  borderRadius: '20px',
-                  border: positionsMode
-                    ? '1px solid rgba(255,255,255,0.06)'
-                    : showSpy
-                      ? '1px solid rgba(0,212,170,0.3)'
-                      : '1px solid rgba(255,255,255,0.1)',
-                  backgroundColor: positionsMode
-                    ? 'rgba(255,255,255,0.03)'
-                    : showSpy
-                      ? 'rgba(0,212,170,0.15)'
-                      : 'rgba(255,255,255,0.06)',
-                  color: positionsMode
-                    ? 'rgba(255,255,255,0.2)'
-                    : showSpy
-                      ? '#00d4aa'
-                      : 'rgba(255,255,255,0.4)',
-                  opacity: positionsMode ? 0.7 : 1,
-                  transition: 'all 0.15s',
-                }}
-              >
-                vs S&P 500
-              </button>
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              gap: '20px',
-              marginBottom: '12px',
-              minHeight: '16px', // reserves space for legend when toggling
-              visibility: showSpy ? 'visible' : 'hidden',
-            }}
-          >
-            <span
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '11px',
-                color: 'rgba(255,255,255,0.5)',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '18px',
-                  height: '2px',
-                  backgroundColor: '#00d4aa',
-                  borderRadius: '1px',
-                }}
-              />
-              Portfolio
-            </span>
-            <span
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '11px',
-                color: 'rgba(255,255,255,0.5)',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '18px',
-                  borderTop: '2px dotted rgba(255,255,255,0.35)',
-                }}
-              />
-              S&amp;P 500
-            </span>
-          </div>
-          <PortfolioChart
-            history={filterHistory(historyWithToday, timeRange)}
-            highlightMode={highlightMode}
-            benchmark={showSpy ? (benchmarkData ?? null) : null}
-          />
-        </div>
-        <div>
-          <p
-            onClick={togglePositionsMode}
-            style={{
-              ...sectionLabel,
-              marginBottom: '16px',
-              cursor: 'pointer',
-              color: positionsMode ? 'var(--text)' : sectionLabel.color,
-              transition: 'color 0.15s',
-              userSelect: 'none',
-            }}
-          >
-            Positions
-          </p>
-          {assets.map((a: any, i: number) => {
-            const isLast      = i === assets.length - 1
-            const isHighlighted = selectedPortfolioAssets.includes(a.name)
-            const assetColor = ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]
-            return (
+      {/* ── Module 1: Hero card ────────────────────────────────────── */}
+      <div style={CARD}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 32 }}>
+
+          {/* Left column: stats + filter buttons + chart */}
+          <div style={{ flex: 1, minWidth: 0, maxWidth: 'calc(100% - 252px)' }}>
+
+            {/* Stats row — centered over the chart, each block clickable to switch chart view */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 72, marginBottom: 8 }}>
+
               <div
-                key={a.name}
-                onClick={() => togglePortfolioAsset(a.name)}
-                onDoubleClick={() => isolatePortfolioAsset(a.name)}
+                onClick={() => setChartView('portfolio')}
                 style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '10px 8px',
-                  marginLeft: '-8px',
-                  marginRight: '-8px',
-                  borderRadius: '6px',
-                  borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
+                  flexDirection: 'column',
                   cursor: 'pointer',
-                  backgroundColor: positionsMode && isHighlighted ? 'rgba(255,255,255,0.04)' : 'transparent',
-                  transition: 'background 0.15s',
+                  paddingBottom: 4,
+                  borderBottom: chartView === 'portfolio' ? '2px solid #00d4aa' : '2px solid transparent',
+                  transition: 'border-color 0.2s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {positionsMode && isHighlighted && (
-                    <div style={{ width: '3px', height: '14px', borderRadius: '2px', backgroundColor: assetColor, flexShrink: 0 }} />
-                  )}
-                  <p style={{ fontSize: '12px', fontWeight: positionsMode && isHighlighted ? 700 : 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0, color: positionsMode && isHighlighted ? assetColor : 'var(--text)' }}>{a.name}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 3px', color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                    ${a.current_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  </p>
-                  <p style={{ fontSize: '11px', margin: 0, fontWeight: 600, color: a.pct_return >= 0 ? 'var(--positive)' : 'var(--negative)', fontVariantNumeric: 'tabular-nums' }}>
-                    {a.pct_return >= 0 ? '+' : ''}{a.pct_return.toFixed(2)}%
-                  </p>
-                </div>
+                <p style={{ ...STAT_LABEL, color: chartView === 'portfolio' ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)' }}>Portfolio Value</p>
+                <p style={{ fontSize: 32, fontWeight: 800, margin: 0, lineHeight: 1, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                  ${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p style={{ fontSize: 12, margin: '4px 0 0', color: '#00d4aa' }}>
+                  {pctReturn >= 0 ? '↑' : '↓'} {Math.abs(pctReturn).toFixed(2)}% all time
+                </p>
               </div>
-            )
-          })}
+
+              <div style={{ width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.08)', margin: '0 24px', flexShrink: 0 }} />
+
+              <div
+                onClick={() => setChartView('sankey')}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  cursor: 'pointer',
+                  paddingBottom: 4,
+                  borderBottom: chartView === 'sankey' ? '2px solid #00d4aa' : '2px solid transparent',
+                  transition: 'border-color 0.2s ease',
+                }}
+              >
+                <p style={{ ...STAT_LABEL, color: chartView === 'sankey' ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)' }}>Total Return</p>
+                <p style={{ fontSize: 28, fontWeight: 700, margin: 0, lineHeight: 1, color: pctReturn >= 0 ? '#00d4aa' : '#ff4d4d', fontVariantNumeric: 'tabular-nums' }}>
+                  {pctReturn >= 0 ? '+' : ''}{pctReturn.toFixed(2)}%
+                </p>
+                <p style={{ fontSize: 12, margin: '4px 0 0', color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
+                  {dollarGain >= 0 ? '+' : ''}${Math.abs(dollarGain).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+            </div>
+
+            {/* Section label — fades between views */}
+            <div style={{ position: 'relative', height: 16, marginBottom: 8 }}>
+              <p style={{ ...SECTION_LABEL, position: 'absolute', opacity: chartView === 'portfolio' ? 1 : 0, transition: 'opacity 0.15s' }}>
+                Portfolio Over Time
+              </p>
+              <p style={{ ...SECTION_LABEL, position: 'absolute', opacity: chartView === 'sankey' ? 1 : 0, transition: 'opacity 0.15s' }}>
+                Return Attribution
+              </p>
+            </div>
+
+            {/* Filter buttons — always in DOM to prevent layout shift; hidden in sankey view */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginBottom: 0, visibility: chartView === 'portfolio' ? 'visible' : 'hidden' }}>
+              {TIME_RANGES.map(r => (
+                <PillButton key={r} active={timeRange === r && !positionsMode} disabled={positionsMode} onClick={() => setTimeRange(r)}>
+                  {r}
+                </PillButton>
+              ))}
+              <div style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.12)', margin: '0 4px' }} />
+              <PillButton active={showSpy} disabled={positionsMode} onClick={() => { if (!positionsMode) setShowSpy(s => !s) }}>
+                vs S&P 500
+              </PillButton>
+            </div>
+
+            {/* S&P 500 legend — always in DOM (fixed height) to prevent layout shift */}
+            <div style={{ display: 'flex', gap: '32px', height: 16, marginBottom: 8, visibility: chartView === 'portfolio' && showSpy ? 'visible' : 'hidden' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                <span style={{ display: 'inline-block', width: 18, height: 2, backgroundColor: '#00d4aa', borderRadius: 1 }} />
+                Portfolio
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                <span style={{ display: 'inline-block', width: 18, borderTop: '2px dotted rgba(255,255,255,0.35)' }} />
+                S&amp;P 500
+              </span>
+            </div>
+
+            {/* Chart area — fixed height container prevents layout shift */}
+            <div style={{ height: 360, flex: 1 }}>
+              {chartView === 'portfolio' ? (
+                <PortfolioChart
+                  history={filterHistory(historyWithToday, timeRange)}
+                  highlightMode={highlightMode}
+                  benchmark={showSpy ? (benchmarkData ?? null) : null}
+                />
+              ) : (
+                <TotalReturnSankey />
+              )}
+            </div>
+          </div>
+
+          {/* Right column: positions */}
+          <div style={{ width: 220, flexShrink: 0 }}>
+            <p
+              onClick={() => setPositionsMode(prev => !prev)}
+              style={{
+                ...SECTION_LABEL,
+                marginBottom: 12,
+                cursor: 'pointer',
+                color: positionsMode ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
+                transition: 'color 0.15s',
+                userSelect: 'none',
+              }}
+            >
+              Positions
+            </p>
+            {assets.map((a: any, i: number) => {
+              const isHighlighted = selectedPortfolioAssets.includes(a.name)
+              const assetColor = ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]
+              const isLast = i === assets.length - 1
+              return (
+                <div
+                  key={a.name}
+                  onClick={() => togglePortfolioAsset(a.name)}
+                  onDoubleClick={() => isolatePortfolioAsset(a.name)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    height: 48,
+                    borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
+                    cursor: positionsMode ? 'pointer' : 'default',
+                    backgroundColor: positionsMode && isHighlighted ? 'rgba(255,255,255,0.03)' : 'transparent',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {positionsMode && isHighlighted && (
+                      <div style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: assetColor, flexShrink: 0 }} />
+                    )}
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: positionsMode && isHighlighted ? assetColor : '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {a.name}
+                      </p>
+                      <p style={{ fontSize: 11, margin: 0, color: 'rgba(255,255,255,0.35)' }}>
+                        {a.allocation_pct?.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                      ${a.current_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </p>
+                    <p style={{ fontSize: 12, margin: 0, fontWeight: 700, color: a.pct_return >= 0 ? '#00d4aa' : '#ff4d4d', fontVariantNumeric: 'tabular-nums' }}>
+                      {a.pct_return >= 0 ? '+' : ''}{a.pct_return.toFixed(2)}%
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Asset Allocation */}
-      <div>
-        <p style={{ ...sectionLabel, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: '20px' }}>Allocation</p>
+      {/* ── Module 2: Allocation ───────────────────────────────────── */}
+      <div style={{ ...CARD, marginTop: 32 }}>
+        <p style={{ ...SECTION_LABEL, marginBottom: 8 }}>Allocation</p>
         <AllocationChart assets={assets} positions={positions} selected={selectedAsset} onSelect={setSelectedAsset} />
       </div>
 
-      <DrawdownChart />
+      {/* ── Module 3: Drawdown + Rolling Return ───────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 48 }}>
+        <div style={CARD}>
+          <DrawdownChart />
+        </div>
+        <div style={CARD}>
+          <RollingReturnChart />
+        </div>
+      </div>
 
-      <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
-
-      <SignalAccuracyScorecard />
-
-      <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
-
-      <RollingReturnChart />
-
-      <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
-
-      <ConfidenceHeatmap />
+      {/* ── Module 4: Confidence Heatmap ──────────────────────────── */}
+      <div style={{ ...CARD, marginTop: 48 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <ConfidenceHeatmap />
+        </div>
+      </div>
 
     </div>
   )
